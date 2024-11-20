@@ -1,0 +1,30 @@
+{
+    "name": "cordova-plugin-background-mode",
+    "version": "1.0",
+    "description": "cordova-plugin-background-mode",
+    "author": "<Your name>",
+    "license": "MIT-0",
+    "homepage": "<Your git repository>",
+    "repository": {
+      "type": "git",
+      "url": "<Your git repository>"
+    },
+    "cordova": {
+      "id": "cordova-plugin-background-mode",
+      "platforms": [
+        "android",
+        "ios"
+      ]
+    },
+    "keywords": [
+      "ecosystem:cordova",
+      "cordova-android",
+      "cordova-ios",
+      "cordova-electron",
+      "cordova",
+      "android",
+      "ios",
+      "electron",
+      "example"
+    ]
+  }
