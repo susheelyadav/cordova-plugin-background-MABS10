@@ -66,197 +66,233 @@ public class BackgroundMode extends CordovaPlugin {
         @Override
         public void onServiceConnected (ComponentName name, IBinder service)
         {
-            try {
-                ForegroundBinder binder = (ForegroundBinder) service;
-                BackgroundMode.this.service = binder.getService();
-            } catch (Exception e) {
-                fireEvent(Event.FAILURE, String.format("'onServiceConnected error: %s'", e.getMessage()));
-            }
+            ForegroundBinder binder = (ForegroundBinder) service;
+            BackgroundMode.this.service = binder.getService();
         }
 
         @Override
         public void onServiceDisconnected (ComponentName name)
         {
-            fireEvent(Event.FAILURE, "'Service disconnected unexpectedly'");
+            fireEvent(Event.FAILURE, "'service disconnected'");
         }
     };
 
+    /**
+     * Executes the request.
+     *
+     * @param action   The action to execute.
+     * @param args     The exec() arguments.
+     * @param callback The callback context used when
+     *                 calling back into JavaScript.
+     *
+     * @return Returning false results in a "MethodNotFound" error.
+     */
     @Override
-    public boolean execute(String action, JSONArray args, CallbackContext callback) {
+    public boolean execute (String action, JSONArray args,
+                            CallbackContext callback)
+    {
         boolean validAction = true;
 
-        try {
-            switch (action) {
-                case "configure":
-                    configure(args.optJSONObject(0), args.optBoolean(1));
-                    break;
-                case "enable":
-                    enableMode();
-                    break;
-                case "disable":
-                    disableMode();
-                    break;
-                default:
-                    validAction = false;
-            }
+        switch (action)
+        {
+            case "configure":
+                configure(args.optJSONObject(0), args.optBoolean(1));
+                break;
+            case "enable":
+                enableMode();
+                break;
+            case "disable":
+                disableMode();
+                break;
+            default:
+                validAction = false;
+        }
 
-            if (validAction) {
-                callback.success();
-            } else {
-                callback.error("Invalid action: " + action);
-            }
-        } catch (Exception e) {
-            callback.error("Error executing action: " + e.getMessage());
-            fireEvent(Event.FAILURE, String.format("'execute error: %s'", e.getMessage()));
+        if (validAction) {
+            callback.success();
+        } else {
+            callback.error("Invalid action: " + action);
         }
 
         return validAction;
     }
 
+    /**
+     * Called when the system is about to start resuming a previous activity.
+     *
+     * @param multitasking Flag indicating if multitasking is turned on for app.
+     */
     @Override
-    public void onPause(boolean multitasking) {
+    public void onPause(boolean multitasking)
+    {
         try {
             inBackground = true;
             startService();
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'onPause error: %s'", e.getMessage()));
         } finally {
             clearKeyguardFlags(cordova.getActivity());
         }
     }
 
+    /**
+     * Called when the activity is no longer visible to the user.
+     */
     @Override
-    public void onStop() {
-        try {
-            clearKeyguardFlags(cordova.getActivity());
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'onStop error: %s'", e.getMessage()));
-        }
+    public void onStop () {
+        clearKeyguardFlags(cordova.getActivity());
     }
 
+    /**
+     * Called when the activity will start interacting with the user.
+     *
+     * @param multitasking Flag indicating if multitasking is turned on for app.
+     */
     @Override
-    public void onResume(boolean multitasking) {
-        try {
-            inBackground = false;
-            stopService();
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'onResume error: %s'", e.getMessage()));
-        }
+    public void onResume (boolean multitasking)
+    {
+        inBackground = false;
+        stopService();
     }
 
+    /**
+     * Called when the activity will be destroyed.
+     */
     @Override
-    public void onDestroy() {
-        try {
-            stopService();
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'onDestroy error: %s'", e.getMessage()));
-        } finally {
-            android.os.Process.killProcess(android.os.Process.myPid());
+    public void onDestroy()
+    {
+        stopService();
+        android.os.Process.killProcess(android.os.Process.myPid());
+    }
+
+    /**
+     * Enable the background mode.
+     */
+    private void enableMode()
+    {
+        isDisabled = false;
+
+        if (inBackground) {
+            startService();
         }
     }
 
-    private void enableMode() {
-        try {
-            isDisabled = false;
+    /**
+     * Disable the background mode.
+     */
+    private void disableMode()
+    {
+        stopService();
+        isDisabled = true;
+    }
 
-            if (inBackground) {
-                startService();
-            }
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'enableMode error: %s'", e.getMessage()));
+    /**
+     * Update the default settings and configure the notification.
+     *
+     * @param settings The settings
+     * @param update A truthy value means to update the running service.
+     */
+    private void configure(JSONObject settings, boolean update)
+    {
+        if (update) {
+            updateNotification(settings);
+        } else {
+            setDefaultSettings(settings);
         }
     }
 
-    private void disableMode() {
-        try {
-            stopService();
-            isDisabled = true;
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'disableMode error: %s'", e.getMessage()));
+    /**
+     * Update the default settings for the notification.
+     *
+     * @param settings The new default settings
+     */
+    private void setDefaultSettings(JSONObject settings)
+    {
+        defaultSettings = settings;
+    }
+
+    /**
+     * Returns the settings for the new/updated notification.
+     */
+    static JSONObject getSettings () {
+        return defaultSettings;
+    }
+
+    /**
+     * Update the notification.
+     *
+     * @param settings The config settings
+     */
+    private void updateNotification(JSONObject settings)
+    {
+        if (isBind) {
+            service.updateNotification(settings);
         }
     }
 
-    private void configure(JSONObject settings, boolean update) {
-        try {
-            if (update) {
-                updateNotification(settings);
-            } else {
-                setDefaultSettings(settings);
-            }
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'configure error: %s'", e.getMessage()));
-        }
-    }
-
-    private void setDefaultSettings(JSONObject settings) {
-        try {
-            defaultSettings = settings;
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'setDefaultSettings error: %s'", e.getMessage()));
-        }
-    }
-
-    private void updateNotification(JSONObject settings) {
-        try {
-            if (isBind) {
-                service.updateNotification(settings);
-            }
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'updateNotification error: %s'", e.getMessage()));
-        }
-    }
-
-    private void startService() {
+    /**
+     * Bind the activity to a background service and put them into foreground
+     * state.
+     */
+    private void startService()
+    {
         Activity context = cordova.getActivity();
 
         if (isDisabled || isBind)
             return;
 
+        
         try {
-            Intent intent = new Intent(context, ForegroundService.class);
+          Intent intent = new Intent(context, ForegroundService.class);
             context.bindService(intent, connection, BIND_AUTO_CREATE);
             fireEvent(Event.ACTIVATE, null);
             context.startService(intent);
         } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'startService error: %s'", e.getMessage()));
+            fireEvent(Event.FAILURE, String.format("'%s'", e.getMessage()));
         }
 
         isBind = true;
     }
 
-    private void stopService() {
+    /**
+     * Bind the activity to a background service and put them into foreground
+     * state.
+     */
+    private void stopService()
+    {
         Activity context = cordova.getActivity();
-        Intent intent = new Intent(context, ForegroundService.class);
+        Intent intent    = new Intent(context, ForegroundService.class);
 
-        if (!isBind)
-            return;
+        if (!isBind) return;
 
-        try {
-            fireEvent(Event.DEACTIVATE, null);
-            context.unbindService(connection);
-            context.stopService(intent);
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'stopService error: %s'", e.getMessage()));
-        } finally {
-            isBind = false;
-        }
+        fireEvent(Event.DEACTIVATE, null);
+        context.unbindService(connection);
+        context.stopService(intent);
+
+        isBind = false;
     }
 
-    private void fireEvent(Event event, String params) {
-        try {
-            String eventName = event.name().toLowerCase();
-            Boolean active = event == Event.ACTIVATE;
+    /**
+     * Fire vent with some parameters inside the web view.
+     *
+     * @param event The name of the event
+     * @param params Optional arguments for the event
+     */
+    private void fireEvent (Event event, String params)
+    {
+        String eventName = event.name().toLowerCase();
+        Boolean active   = event == Event.ACTIVATE;
 
-            String str = String.format("%s._setActive(%b)", JS_NAMESPACE, active);
-            str = String.format("%s;%s.on('%s', %s)", str, JS_NAMESPACE, eventName, params);
-            str = String.format("%s;%s.fireEvent('%s',%s);", str, JS_NAMESPACE, eventName, params);
+        String str = String.format("%s._setActive(%b)",
+                JS_NAMESPACE, active);
 
-            final String js = str;
+        str = String.format("%s;%s.on('%s', %s)",
+                str, JS_NAMESPACE, eventName, params);
 
-            cordova.getActivity().runOnUiThread(() -> webView.loadUrl("javascript:" + js));
-        } catch (Exception e) {
-            fireEvent(Event.FAILURE, String.format("'fireEvent error: %s'", e.getMessage()));
-        }
+        str = String.format("%s;%s.fireEvent('%s',%s);",
+                str, JS_NAMESPACE, eventName, params);
+
+        final String js = str;
+
+        cordova.getActivity().runOnUiThread(() -> webView.loadUrl("javascript:" + js));
     }
-}
+} 
 
